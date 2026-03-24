@@ -1,13 +1,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElCard, ElSkeleton, ElButton } from 'element-plus'
 import api from '@/utils/api'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
-const router = useRouter()
-
 const stats = ref({ myTasks: {}, projectCount: 0, recentWorklogs: [] })
 const loading = ref(true)
 
@@ -18,11 +14,10 @@ onMounted(async () => {
       api.get('/projects'),
       api.get('/worklogs')
     ])
-
     stats.value = {
       myTasks: taskStats.data,
       projectCount: projects.data.length,
-      recentWorklogs: worklogs.data.slice(0, 5)
+      recentWorklogs: worklogs.data.slice(0, 6)
     }
   } catch (err) {
     console.error(err)
@@ -31,112 +26,162 @@ onMounted(async () => {
   }
 })
 
-const getTaskStatusLabel = (s) => ({ todo: '待办', in_progress: '进行中', done: '已完成' }[s] || s)
-const getTaskStatusType = (s) => ({ todo: 'info', in_progress: 'warning', done: 'success' }[s] || 'info')
+const taskItems = [
+  { key: 'todo', label: '待办', color: '#3b82f6', bg: 'linear-gradient(135deg, #3b82f6, #60a5fa)', icon: '📋' },
+  { key: 'in_progress', label: '进行中', color: '#f59e0b', bg: 'linear-gradient(135deg, #f59e0b, #fbbf24)', icon: '⚡' },
+  { key: 'done', label: '已完成', color: '#10b981', bg: 'linear-gradient(135deg, #10b981, #34d399)', icon: '✅' },
+]
 </script>
 
 <template>
-  <div class="layout">
-    <!-- Header -->
-    <header class="header">
-      <h2>任务协作平台</h2>
-      <div class="header-right">
-        <span>{{ authStore.user?.name || 'User' }}</span>
-        <el-button size="small" @click="authStore.logout(); router.push('/login')">退出</el-button>
+  <div class="dashboard">
+    <!-- Hero Section -->
+    <div class="hero">
+      <div class="hero-content">
+        <div class="greeting">
+          <h1>👋 你好，{{ authStore.user?.name || '开发者' }}</h1>
+          <p>今天也要加油 💪</p>
+        </div>
+        <div class="hero-date">{{ new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }) }}</div>
       </div>
-    </header>
+      <div class="hero-illustration">🎯</div>
+    </div>
 
-    <div class="container">
-      <!-- Quick nav -->
-      <div class="quick-nav">
-        <el-card shadow="hover" @click="router.push('/projects')" class="nav-card">
-          <h3>📁 项目</h3>
-          <p>{{ stats.projectCount }} 个项目</p>
-        </el-card>
-        <el-card shadow="hover" @click="router.push('/tasks')" class="nav-card">
-          <h3>✅ 任务</h3>
-          <p>{{ stats.myTasks.total || 0 }} 个任务</p>
-        </el-card>
-        <el-card shadow="hover" @click="router.push('/worklogs')" class="nav-card">
-          <h3>📝 工作记录</h3>
-          <p>查看记录</p>
-        </el-card>
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+      <div
+        v-for="item in taskItems"
+        :key="item.key"
+        class="stat-card"
+        :style="{ background: item.bg }"
+      >
+        <div class="stat-icon">{{ item.icon }}</div>
+        <div class="stat-body">
+          <div class="stat-value">{{ stats.myTasks[item.key] || 0 }}</div>
+          <div class="stat-label">{{ item.label }}</div>
+        </div>
       </div>
+      <div class="stat-card stat-card-project" style="background: linear-gradient(135deg, #8b5cf6, #a78bfa)">
+        <div class="stat-icon">📁</div>
+        <div class="stat-body">
+          <div class="stat-value">{{ stats.projectCount }}</div>
+          <div class="stat-label">项目总数</div>
+        </div>
+      </div>
+    </div>
 
-      <!-- Task summary -->
-      <el-card class="section-card">
-        <template #header>
-          <div class="card-header">
-            <span>我的任务</span>
-            <el-button size="small" @click="router.push('/tasks')">查看全部</el-button>
-          </div>
-        </template>
-        <div class="task-summary" v-if="!loading">
-          <div class="task-stat">
-            <span class="label">待办</span>
-            <span class="value info">{{ stats.myTasks.todo || 0 }}</span>
-          </div>
-          <div class="task-stat">
-            <span class="label">进行中</span>
-            <span class="value warning">{{ stats.myTasks.in_progress || 0 }}</span>
-          </div>
-          <div class="task-stat">
-            <span class="label">已完成</span>
-            <span class="value success">{{ stats.myTasks.done || 0 }}</span>
+    <!-- Recent Worklogs -->
+    <div class="section">
+      <div class="section-header">
+        <h2>最近工作记录</h2>
+        <router-link to="/worklogs" class="more-link">查看全部 →</router-link>
+      </div>
+      <div class="worklog-grid" v-if="!loading && stats.recentWorklogs.length">
+        <div v-for="log in stats.recentWorklogs" :key="log.id" class="worklog-card">
+          <div class="worklog-icon">{{ log.category === '设计' ? '🎨' : log.category === '开发' ? '💻' : log.category === '测试' ? '🧪' : '📝' }}</div>
+          <div class="worklog-body">
+            <div class="worklog-title">{{ log.title }}</div>
+            <div class="worklog-meta">
+              <span class="worklog-cat">{{ log.category }}</span>
+              <span class="worklog-time">{{ new Date(log.createdAt).toLocaleDateString('zh-CN', { month:'short', day:'numeric' }) }}</span>
+            </div>
           </div>
         </div>
-        <el-skeleton v-else :rows="1" animated />
-      </el-card>
-
-      <!-- Recent worklogs -->
-      <el-card class="section-card">
-        <template #header>
-          <div class="card-header">
-            <span>最近工作记录</span>
-            <el-button size="small" @click="router.push('/worklogs')">查看全部</el-button>
-          </div>
-        </template>
-        <div v-if="!loading">
-          <div v-for="log in stats.recentWorklogs" :key="log.id" class="worklog-item">
-            <span class="worklog-title">{{ log.title }}</span>
-            <el-tag size="small" type="info">{{ log.category }}</el-tag>
-          </div>
-          <div v-if="!stats.recentWorklogs.length" class="empty">暂无记录</div>
-        </div>
-        <el-skeleton v-else :rows="3" animated />
-      </el-card>
+      </div>
+      <div class="empty-state" v-else-if="!loading">
+        <div class="empty-icon">📭</div>
+        <div class="empty-text">暂无工作记录</div>
+      </div>
+      <div class="skeleton-grid" v-else>
+        <div class="skeleton-card" v-for="i in 4" :key="i"></div>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.layout { min-height: 100vh; background: #f5f7fa; }
-.header {
-  background: white;
-  padding: 16px 24px;
+.dashboard { padding: 32px 40px; max-width: 1200px; }
+
+/* Hero */
+.hero {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  border-radius: 20px;
+  padding: 36px 40px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  margin-bottom: 28px;
+  position: relative;
+  overflow: hidden;
 }
-.header h2 { margin: 0; font-size: 18px; }
-.header-right { display: flex; align-items: center; gap: 12px; }
-.container { max-width: 900px; margin: 24px auto; padding: 0 16px; }
-.quick-nav { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
-.nav-card { cursor: pointer; text-align: center; }
-.nav-card h3 { margin: 0 0 8px; font-size: 16px; }
-.nav-card p { margin: 0; color: #666; font-size: 13px; }
-.section-card { margin-bottom: 16px; }
-.card-header { display: flex; justify-content: space-between; align-items: center; }
-.task-summary { display: flex; gap: 32px; }
-.task-stat { text-align: center; }
-.task-stat .label { display: block; font-size: 13px; color: #666; margin-bottom: 4px; }
-.task-stat .value { font-size: 28px; font-weight: bold; }
-.value.info { color: #409eff; }
-.value.warning { color: #e6a23c; }
-.value.success { color: #67c23a; }
-.worklog-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
-.worklog-item:last-child { border-bottom: none; }
-.worklog-title { font-size: 14px; }
-.empty { color: #999; text-align: center; padding: 16px; }
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -10%;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(99,102,241,0.15), transparent 70%);
+  border-radius: 50%;
+}
+.hero-content { position: relative; z-index: 1; }
+.greeting h1 { font-size: 28px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+.greeting p { font-size: 15px; color: rgba(255,255,255,0.6); }
+.hero-date { font-size: 13px; color: rgba(255,255,255,0.4); text-align: right; position: relative; z-index: 1; }
+.hero-illustration { font-size: 64px; position: relative; z-index: 1; }
+
+/* Stats */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-bottom: 32px;
+}
+.stat-card {
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+.stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
+.stat-icon { font-size: 32px; }
+.stat-value { font-size: 36px; font-weight: 700; color: #fff; line-height: 1; }
+.stat-label { font-size: 13px; color: rgba(255,255,255,0.8); margin-top: 4px; }
+
+/* Section */
+.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.section-header h2 { font-size: 20px; font-weight: 700; color: #1a1a2e; }
+.more-link { font-size: 14px; color: #6366f1; text-decoration: none; font-weight: 500; }
+.more-link:hover { color: #4f46e5; }
+
+/* Worklog grid */
+.worklog-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.worklog-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  border: 1px solid #f0f0f0;
+  transition: all 0.2s;
+}
+.worklog-card:hover { border-color: #e0e7ff; box-shadow: 0 4px 16px rgba(99,102,241,0.08); transform: translateY(-2px); }
+.worklog-icon { font-size: 28px; }
+.worklog-title { font-size: 14px; font-weight: 600; color: #1a1a2e; margin-bottom: 8px; line-height: 1.4; }
+.worklog-meta { display: flex; gap: 10px; align-items: center; }
+.worklog-cat { font-size: 12px; background: #f0f0f7; color: #6366f1; padding: 2px 8px; border-radius: 6px; font-weight: 500; }
+.worklog-time { font-size: 12px; color: #999; }
+
+/* Empty & skeleton */
+.empty-state { text-align: center; padding: 48px; background: #fff; border-radius: 16px; border: 1px solid #f0f0f0; }
+.empty-icon { font-size: 48px; margin-bottom: 12px; }
+.empty-text { color: #999; font-size: 14px; }
+.skeleton-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.skeleton-card { height: 100px; background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; border-radius: 14px; animation: shimmer 1.5s infinite; }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 </style>

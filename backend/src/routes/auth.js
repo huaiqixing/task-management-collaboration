@@ -79,26 +79,15 @@ router.get('/google/callback', async (req, res) => {
     )
 
     // Redirect to frontend
-    res.redirect(`http://localhost:5173/auth/callback?token=${token}`)
+    res.redirect(`https://task-management-5sg.pages.dev/auth/callback?token=${token}`)
   } catch (err) {
     console.error('Google OAuth error:', err)
-    res.redirect(`http://localhost:5173/login?error=auth_failed`)
+    res.redirect(`https://task-management-5sg.pages.dev/login?error=auth_failed`)
   }
 })
 
 // Get current user
 router.get('/me', authenticateToken, async (req, res) => {
-  // Dev mode: return mock user directly
-  if (req.user && req.user.id === 1 && req.user.name === '开发者') {
-    return res.json({
-      id: 1,
-      email: 'dev@example.com',
-      name: '开发者',
-      avatar: null,
-      role: 'admin'
-    })
-  }
-
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },

@@ -44,7 +44,7 @@ router.get('/google', async (req, res) => {
 })
 
 // Google OAuth callback
-router.get('/google/callback', async (req, res) => {
+router.get('/callback/google', async (req, res) => {
   if (IS_DEV_MODE) {
     return res.redirect(`http://localhost:5173/auth/callback?token=dummy`)
   }

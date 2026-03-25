@@ -4,7 +4,7 @@ const DEV_MODE = true
 const DEV_TOKEN = 'dev-mode-token'
 
 const api = axios.create({
-  baseURL: 'http://118.25.177.169:3000/api',
+  baseURL: 'https://118.25.177.169/api',
   timeout: 10000
 })
 

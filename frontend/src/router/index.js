@@ -5,6 +5,7 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', redirect: '/dashboard' },
+    { path: '/clock', component: () => import('@/views/ClockPage.vue') },
     {
       path: '/login',
       component: () => import('@/views/Login.vue')

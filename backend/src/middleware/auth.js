@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken'
 
 const DEV_MODE = true
 const DEV_TOKEN = 'dev-mode-token'
-const DEV_USER = { id: 1, name: '开发者', email: 'dev@example.com', role: 'admin' }
+const DEV_USER = { id: 'dev-user-1', name: '开发者', email: 'dev@example.com', role: 'admin' }
 
 export function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization']

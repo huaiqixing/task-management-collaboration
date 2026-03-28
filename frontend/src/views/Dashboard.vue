@@ -1,8 +1,10 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import api from '@/utils/api'
 import { useAuthStore } from '@/stores/auth'
 
+const router = useRouter()
 const authStore = useAuthStore()
 const stats = ref({ myTasks: {}, projectCount: 0, recentWorklogs: [] })
 const loading = ref(true)
@@ -20,7 +22,9 @@ onMounted(async () => {
       recentWorklogs: worklogs.data.slice(0, 6)
     }
   } catch (err) {
-    console.error(err)
+    if (err.response?.status === 401) {
+      router.push('/login')
+    }
   } finally {
     loading.value = false
   }
@@ -39,10 +43,15 @@ const taskItems = [
     <div class="hero">
       <div class="hero-content">
         <div class="greeting">
-          <h1>👋 你好，{{ authStore.user?.name || '开发者' }}</h1>
+          <h1>👋 你好{{ authStore.user?.name ? '，' + authStore.user.name : '' }}</h1>
           <p>今天也要加油 💪</p>
         </div>
         <div class="hero-date">{{ new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }) }}</div>
+      </div>
+      <div class="hero-actions">
+        <router-link to="/pricing" class="upgrade-btn">
+          💎 查看定价方案
+        </router-link>
       </div>
       <div class="hero-illustration">🎯</div>
     </div>
@@ -129,6 +138,23 @@ const taskItems = [
 .greeting p { font-size: 15px; color: rgba(255,255,255,0.6); }
 .hero-date { font-size: 13px; color: rgba(255,255,255,0.4); text-align: right; position: relative; z-index: 1; }
 .hero-illustration { font-size: 64px; position: relative; z-index: 1; }
+.hero-actions { position: relative; z-index: 1; margin-right: 20px; }
+.upgrade-btn {
+  display: inline-block;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+  text-decoration: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+  box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+}
+.upgrade-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+}
 
 /* Stats */
 .stats-grid {

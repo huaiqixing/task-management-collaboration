@@ -1,8 +1,12 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElCard, ElButton, ElDialog, ElForm, ElFormItem, ElInput, ElSelect, ElOption, ElDatePicker, ElMessage, ElTag, ElTable } from 'element-plus'
 import api from '@/utils/api'
+import { useAuthStore } from '@/stores/auth'
 
+const router = useRouter()
+const authStore = useAuthStore()
 const worklogs = ref([])
 const loading = ref(true)
 const dialogVisible = ref(false)
@@ -27,7 +31,9 @@ const loadWorklogs = async () => {
     const res = await api.get('/worklogs')
     worklogs.value = res.data
   } catch (err) {
-    ElMessage.error('加载失败')
+    if (err.response?.status === 401) {
+      router.push('/login')
+    }
   } finally {
     loading.value = false
   }
@@ -40,7 +46,14 @@ const loadProjects = async () => {
   } catch (err) { console.error(err) }
 }
 
-const openCreate = () => { form.value = { title: '', content: '', date: new Date(), category: 'work', projectId: '', tags: '' }; dialogVisible.value = true }
+const openCreate = () => {
+  if (!authStore.isLoggedIn) {
+    router.push('/login')
+    return
+  }
+  form.value = { title: '', content: '', date: new Date(), category: 'work', projectId: '', tags: '' }
+  dialogVisible.value = true
+}
 
 const createWorklog = async () => {
   if (!form.value.title.trim()) return
@@ -52,7 +65,11 @@ const createWorklog = async () => {
     dialogVisible.value = false
     ElMessage.success('记录创建成功')
   } catch (err) {
-    ElMessage.error('创建失败')
+    if (err.response?.status === 401) {
+      router.push('/login')
+    } else {
+      ElMessage.error('创建失败')
+    }
   } finally {
     creating.value = false
   }

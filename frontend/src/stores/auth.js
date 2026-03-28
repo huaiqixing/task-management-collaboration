@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import api from '@/utils/api'
 
 // 开发模式：用本地 mock user 直接跳过登录
-const DEV_MODE = true
+const DEV_MODE = false
 const DEV_USER = {
   id: 1,
   name: '开发者',
@@ -35,7 +35,10 @@ export const useAuthStore = defineStore('auth', {
         this.user = res.data
         return this.user
       } catch (err) {
-        this.logout()
+        // 401 means not logged in - just clear user but don't logout (logout clears token too)
+        if (err.response?.status === 401) {
+          this.user = null
+        }
         return null
       } finally {
         this.loading = false

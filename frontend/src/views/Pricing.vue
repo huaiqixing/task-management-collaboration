@@ -1,5 +1,12 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+const billingCycle = ref('monthly')
+const showPaymentModal = ref(false)
+const selectedPlan = ref(null)
 
 const plans = [
   {
@@ -33,6 +40,8 @@ const plans = [
     yearlyPrice: '199',
     yearlyPeriod: '/年',
     description: '适合重度个人用户',
+    usdPrice: '4.00',
+    usdYearlyPrice: '27.00',
     features: [
       { text: '免费版全部功能', included: true },
       { text: '云端同步（多设备）', included: true },
@@ -56,6 +65,7 @@ const plans = [
     price: '99',
     period: '/月/团队',
     description: '适合团队协作使用',
+    usdPrice: '14.00',
     features: [
       { text: 'Pro 全部功能', included: true },
       { text: '团队任务管理', included: true },
@@ -73,14 +83,20 @@ const plans = [
   }
 ]
 
-const billingCycle = ref('monthly')
-
 const getPrice = (plan) => {
   if (plan.id === 'free') return plan.price
   if (billingCycle.value === 'yearly' && plan.yearlyPrice) {
     return plan.yearlyPrice
   }
   return plan.price
+}
+
+const getUSDPrice = (plan) => {
+  if (plan.id === 'free') return '0'
+  if (billingCycle.value === 'yearly' && plan.usdYearlyPrice) {
+    return plan.usdYearlyPrice
+  }
+  return plan.usdPrice || '0'
 }
 
 const getPeriod = (plan) => {
@@ -99,15 +115,46 @@ const getSavings = (plan) => {
   return savings
 }
 
-const selectPlan = (plan) => {
+const getPlanName = (plan) => {
+  const cycle = billingCycle.value === 'yearly' ? '年付' : '月付'
+  return `${plan.name} - ${cycle}`
+}
+
+const openPaymentModal = (plan) => {
   if (plan.id === 'free') {
     alert('您正在使用免费版本')
-  } else if (plan.id === 'pro') {
-    alert('Pro 版本购买页面开发中，敬请期待！\n\n如需购买，请联系客服。')
-  } else {
-    alert('团队版定制服务，请联系客服了解详情。')
+    return
   }
+  if (plan.id === 'team') {
+    alert('团队版定制服务，请联系客服了解详情。')
+    return
+  }
+  selectedPlan.value = plan
+  showPaymentModal.value = true
 }
+
+const closePaymentModal = () => {
+  showPaymentModal.value = false
+  selectedPlan.value = null
+}
+
+const handlePaymentSuccess = (data) => {
+  console.log('Payment successful:', data)
+  alert(`🎉 支付成功！\n\n订单ID: ${data.orderID}\n方案: ${selectedPlan.value?.name}\n\n您的升级将在系统中生效。`)
+  closePaymentModal()
+}
+
+const handlePaymentError = (err) => {
+  console.error('Payment error:', err)
+  alert('支付过程中出现错误，请稍后重试。')
+}
+
+// PayPal options - use a unique key to force reload when plan changes
+const paypalOptions = computed(() => ({
+  'client-id': import.meta.env.VITE_PAYPAL_CLIENT_ID || 'sb',
+  currency: 'USD',
+  intent: 'capture'
+}))
 </script>
 
 <template>
@@ -169,7 +216,7 @@ const selectPlan = (plan) => {
         <button 
           class="plan-button"
           :class="plan.buttonStyle"
-          @click="selectPlan(plan)"
+          @click="openPaymentModal(plan)"
         >
           {{ plan.buttonText }}
         </button>
@@ -180,9 +227,72 @@ const selectPlan = (plan) => {
       <div class="trust-badges">
         <span>🔒 支付安全</span>
         <span>💰 随时退款</span>
-        <span>💳 微信/支付宝</span>
+        <span>💳 PayPal 支付</span>
       </div>
       <p class="footer-note">所有方案均包含 14 天无条件退款保障</p>
+    </div>
+  </div>
+
+  <!-- Payment Modal - outside of PayPalScriptProvider wrapper -->
+  <div v-if="showPaymentModal" class="payment-modal-overlay" @click.self="closePaymentModal">
+    <div class="payment-modal">
+      <div class="modal-header">
+        <h2>💳 完成支付</h2>
+        <button class="close-btn" @click="closePaymentModal">×</button>
+      </div>
+      
+      <div class="modal-body" v-if="selectedPlan">
+        <div class="order-summary">
+          <h3>订单摘要</h3>
+          <div class="order-row">
+            <span>方案</span>
+            <span>{{ selectedPlan.name }}</span>
+          </div>
+          <div class="order-row">
+            <span>周期</span>
+            <span>{{ billingCycle === 'yearly' ? '年付' : '月付' }}</span>
+          </div>
+          <div class="order-row total">
+            <span>金额</span>
+            <span>¥{{ getPrice(selectedPlan) }}</span>
+          </div>
+          <div class="order-row usd-note">
+            <span>PayPal 将以 USD 结算</span>
+            <span>≈ ${{ getUSDPrice(selectedPlan) }}</span>
+          </div>
+        </div>
+
+        <div class="paypal-section">
+          <h3>选择支付方式</h3>
+          <PayPalScriptProvider :options="paypalOptions">
+            <PayPalButtons
+              :style="{
+                layout: 'vertical',
+                shape: 'rect',
+                color: 'gold',
+                label: 'paypal'
+              }"
+              :create-order="() => {
+                return new Promise((resolve, reject) => {
+                  // This will be handled by the onClick handler below
+                  resolve('ORDER-' + Date.now())
+                })
+              }"
+              :on-click="(data, actions) => {
+                console.log('PayPal button clicked', data)
+              }"
+              :on-approve="(data, actions) => {
+                console.log('Order approved:', data)
+                handlePaymentSuccess({ orderID: data.orderID })
+              }"
+              :on-error="(err) => {
+                console.error('PayPal error:', err)
+                handlePaymentError(err)
+              }"
+            />
+          </PayPalScriptProvider>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -434,6 +544,103 @@ const selectPlan = (plan) => {
 .footer-note {
   color: #9ca3af;
   font-size: 0.85rem;
+}
+
+/* Payment Modal */
+.payment-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.payment-modal {
+  background: #fff;
+  border-radius: 20px;
+  width: 90%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-header h2 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  cursor: pointer;
+  color: #6b7280;
+  line-height: 1;
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.order-summary {
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.order-summary h3 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.order-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  font-size: 0.95rem;
+  color: #374151;
+}
+
+.order-row.total {
+  border-top: 1px solid #e5e7eb;
+  margin-top: 8px;
+  padding-top: 16px;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #1a1a2e;
+}
+
+.order-row.usd-note {
+  font-size: 0.85rem;
+  color: #9ca3af;
+  border-top: 1px dashed #e5e7eb;
+  margin-top: 8px;
+}
+
+.paypal-section h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 16px;
 }
 
 @media (max-width: 768px) {

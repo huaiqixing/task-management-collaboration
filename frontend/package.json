@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@paypal/react-paypal-js": "^9.1.0",
     "axios": "^1.7.9",
     "element-plus": "^2.9.7",
     "pinia": "^3.0.3",

@@ -6,7 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 const router = useRouter()
 const authStore = useAuthStore()
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://118.25.177.169/api'
+const API_BASE = import.meta.env.VITE_API_BASE || 'https://nanophoto.store/api'
 
 onMounted(async () => {
   const params = new URLSearchParams(window.location.search)
@@ -26,8 +26,8 @@ onMounted(async () => {
   }
 })
 
-function goGoogleLogin() {
-  window.location.href = `${API_BASE}/auth/google`
+function goGithubLogin() {
+  window.location.href = `${API_BASE}/auth/github`
 }
 </script>
 
@@ -35,9 +35,9 @@ function goGoogleLogin() {
   <div class="login-page">
     <div class="login-card">
       <h1>任务协作平台</h1>
-      <p>使用 Google 账号一键登录</p>
-      <el-button type="primary" size="large" @click="goGoogleLogin">
-        使用 Google 登录
+      <p>使用 GitHub 账号一键登录</p>
+      <el-button type="primary" size="large" @click="goGithubLogin">
+        使用 GitHub 登录
       </el-button>
     </div>
   </div>

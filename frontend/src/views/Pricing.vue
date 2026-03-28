@@ -1,12 +1,11 @@
 <script setup>
-import { ref, computed } from 'vue'
-import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
 
-const router = useRouter()
 const billingCycle = ref('monthly')
 const showPaymentModal = ref(false)
 const selectedPlan = ref(null)
+const paypalLoaded = ref(false)
+const paypalError = ref(false)
 
 const plans = [
   {
@@ -131,6 +130,9 @@ const openPaymentModal = (plan) => {
   }
   selectedPlan.value = plan
   showPaymentModal.value = true
+  
+  // 等待 DOM 更新后初始化 PayPal
+  setTimeout(initPayPalButton, 100)
 }
 
 const closePaymentModal = () => {
@@ -149,12 +151,93 @@ const handlePaymentError = (err) => {
   alert('支付过程中出现错误，请稍后重试。')
 }
 
-// PayPal options - use a unique key to force reload when plan changes
-const paypalOptions = computed(() => ({
-  'client-id': import.meta.env.VITE_PAYPAL_CLIENT_ID || 'sb',
-  currency: 'USD',
-  intent: 'capture'
-}))
+let paypalScript = null
+
+const initPayPalButton = () => {
+  const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID || 'sb'
+  
+  // 如果已经加载过了，不要重复加载
+  if (window.paypal) {
+    renderPayPalButtons()
+    return
+  }
+  
+  // 移除旧的 script
+  const existingScript = document.getElementById('paypal-sdk')
+  if (existingScript) {
+    existingScript.remove()
+  }
+  
+  // 加载 PayPal SDK
+  paypalScript = document.createElement('script')
+  paypalScript.id = 'paypal-sdk'
+  paypalScript.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD&intent=capture`
+  paypalScript.async = true
+  
+  paypalScript.onload = () => {
+    paypalLoaded.value = true
+    renderPayPalButtons()
+  }
+  
+  paypalScript.onerror = () => {
+    console.error('Failed to load PayPal SDK')
+    paypalError.value = true
+  }
+  
+  document.head.appendChild(paypalScript)
+}
+
+const renderPayPalButtons = () => {
+  if (!window.paypal || !selectedPlan.value) return
+  
+  const container = document.getElementById('paypal-button-container')
+  if (!container) return
+  
+  // 清空容器
+  container.innerHTML = ''
+  
+  const amount = getUSDPrice(selectedPlan.value)
+  
+  window.paypal.Buttons({
+    style: {
+      layout: 'vertical',
+      shape: 'rect',
+      color: 'gold',
+      label: 'paypal'
+    },
+    createOrder: (data, actions) => {
+      return actions.order.create({
+        intent: 'CAPTURE',
+        purchase_units: [{
+          description: getPlanName(selectedPlan.value),
+          amount: {
+            currency_code: 'USD',
+            value: amount
+          }
+        }]
+      })
+    },
+    onApprove: (data, actions) => {
+      return actions.order.capture().then(details => {
+        handlePaymentSuccess({
+          orderID: data.orderID,
+          details: details
+        })
+      })
+    },
+    onError: (err) => {
+      handlePaymentError(err)
+    }
+  }).render('#paypal-button-container')
+}
+
+// 监听弹窗关闭，清理 PayPal
+const onModalClose = () => {
+  const container = document.getElementById('paypal-button-container')
+  if (container) {
+    container.innerHTML = ''
+  }
+}
 </script>
 
 <template>
@@ -233,9 +316,9 @@ const paypalOptions = computed(() => ({
     </div>
   </div>
 
-  <!-- Payment Modal - outside of PayPalScriptProvider wrapper -->
+  <!-- Payment Modal -->
   <div v-if="showPaymentModal" class="payment-modal-overlay" @click.self="closePaymentModal">
-    <div class="payment-modal">
+    <div class="payment-modal" @click.stop>
       <div class="modal-header">
         <h2>💳 完成支付</h2>
         <button class="close-btn" @click="closePaymentModal">×</button>
@@ -264,33 +347,13 @@ const paypalOptions = computed(() => ({
 
         <div class="paypal-section">
           <h3>选择支付方式</h3>
-          <PayPalScriptProvider :options="paypalOptions">
-            <PayPalButtons
-              :style="{
-                layout: 'vertical',
-                shape: 'rect',
-                color: 'gold',
-                label: 'paypal'
-              }"
-              :create-order="() => {
-                return new Promise((resolve, reject) => {
-                  // This will be handled by the onClick handler below
-                  resolve('ORDER-' + Date.now())
-                })
-              }"
-              :on-click="(data, actions) => {
-                console.log('PayPal button clicked', data)
-              }"
-              :on-approve="(data, actions) => {
-                console.log('Order approved:', data)
-                handlePaymentSuccess({ orderID: data.orderID })
-              }"
-              :on-error="(err) => {
-                console.error('PayPal error:', err)
-                handlePaymentError(err)
-              }"
-            />
-          </PayPalScriptProvider>
+          <div v-if="paypalError" class="paypal-error">
+            <p>⚠️ PayPal SDK 加载失败</p>
+            <p class="paypal-error-hint">请检查网络连接，或稍后重试</p>
+          </div>
+          <div v-else id="paypal-button-container" class="paypal-button-container">
+            <div class="paypal-loading">正在加载支付按钮...</div>
+          </div>
         </div>
       </div>
     </div>
@@ -641,6 +704,30 @@ const paypalOptions = computed(() => ({
   font-weight: 600;
   color: #1a1a2e;
   margin-bottom: 16px;
+}
+
+.paypal-button-container {
+  min-height: 150px;
+}
+
+.paypal-loading {
+  text-align: center;
+  padding: 40px;
+  color: #6b7280;
+}
+
+.paypal-error {
+  text-align: center;
+  padding: 20px;
+  background: #fef2f2;
+  border-radius: 8px;
+  color: #991b1b;
+}
+
+.paypal-error-hint {
+  font-size: 0.85rem;
+  margin-top: 8px;
+  color: #dc2626;
 }
 
 @media (max-width: 768px) {

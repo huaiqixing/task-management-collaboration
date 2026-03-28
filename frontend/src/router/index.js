@@ -38,6 +38,11 @@ const router = createRouter({
       path: '/worklogs',
       component: () => import('@/views/WorkLogs.vue'),
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/pricing',
+      component: () => import('@/views/Pricing.vue'),
+      meta: { requiresAuth: true }
     }
   ]
 })
@@ -45,9 +50,19 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
 
-  if (to.meta.requiresAuth && !authStore.token) {
-    next('/login')
-    return
+  if (to.meta.requiresAuth) {
+    if (!authStore.token) {
+      next('/login')
+      return
+    }
+    // Token exists but user not loaded - fetch user
+    if (!authStore.user) {
+      await authStore.fetchUser()
+      if (!authStore.user) {
+        next('/login')
+        return
+      }
+    }
   }
 
   if ((to.path === '/login' || to.path === '/auth/callback') && authStore.token) {

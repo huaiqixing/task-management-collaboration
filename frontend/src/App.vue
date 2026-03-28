@@ -13,6 +13,7 @@ const navItems = [
   { path: '/projects', label: '项目管理', icon: '📁' },
   { path: '/tasks', label: '任务管理', icon: '✅' },
   { path: '/worklogs', label: '工作记录', icon: '📝' },
+  { path: '/pricing', label: '💎 定价', icon: '💎' },
 ]
 
 const isActive = (path) => route.path === path || (path !== '/dashboard' && route.path.startsWith(path))
@@ -21,6 +22,14 @@ const handleLogout = () => {
   authStore.logout()
   router.push('/login')
 }
+
+const sidebarUser = computed(() => {
+  if (!authStore.user) return { name: '游客', role: '' }
+  return {
+    name: authStore.user.name || '用户',
+    role: authStore.user.role === 'admin' ? '管理员' : '成员'
+  }
+})
 </script>
 
 <template>
@@ -45,10 +54,10 @@ const handleLogout = () => {
       </nav>
       <div class="sidebar-footer">
         <div class="user-info" v-if="!collapsed">
-          <div class="user-avatar">{{ authStore.user?.name?.[0] || 'U' }}</div>
+          <div class="user-avatar">{{ sidebarUser.name[0] }}</div>
           <div class="user-detail">
-            <div class="user-name">{{ authStore.user?.name || 'User' }}</div>
-            <div class="user-role">{{ authStore.user?.role === 'admin' ? '管理员' : '成员' }}</div>
+            <div class="user-name">{{ sidebarUser.name }}</div>
+            <div class="user-role" v-if="sidebarUser.role">{{ sidebarUser.role }}</div>
           </div>
         </div>
         <button class="logout-btn" @click="handleLogout" :title="collapsed ? '退出' : ''">
